@@ -4,7 +4,7 @@
   "description": "Backend API and WebSocket Engine for Cookscape Communication Platform",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.js",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "postinstall": "prisma generate",
     "start": "node dist/server.js",
