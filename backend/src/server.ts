@@ -92,13 +92,23 @@ server.listen(PORT, async () => {
   console.log(`======================================================\n`);
 
   try {
-    // Auto-seed if database is newly initialized
+    console.log('⚡ Syncing database schema with Prisma...');
+    const { execSync } = await import('child_process');
+    try {
+      execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+      console.log('✅ Database schema verified and synced successfully.');
+    } catch (pushErr: any) {
+      console.warn('Note on schema push:', pushErr?.message || pushErr);
+    }
+
+    // Auto-seed if database has no users
     const userCount = await prisma.user.count();
     if (userCount === 0) {
-      console.log('⚡ Initializing and seeding Cookscape database...');
+      console.log('⚡ Seeding initial Cookscape enterprise accounts...');
       await seedDatabase();
+      console.log('✅ Seed completed successfully!');
     }
   } catch (error) {
-    console.error('Error during auto-seed check:', error);
+    console.error('Error during database initialization/seeding:', error);
   }
 });
