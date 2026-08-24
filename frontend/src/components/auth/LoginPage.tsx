@@ -176,10 +176,47 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Server Endpoint Settings Accordion */}
+        <div className="bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 text-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+            <span className="font-medium text-[11px]">🔗 Backend API Server:</span>
+            <span className="font-mono text-[10px] text-red-600 dark:text-red-400 truncate max-w-[200px]">
+              {localStorage.getItem('cookscape_api_url') || import.meta.env.VITE_API_URL || '(Local Proxy)'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2 pt-1">
+            <input
+              type="text"
+              defaultValue={localStorage.getItem('cookscape_api_url') || import.meta.env.VITE_API_URL || ''}
+              placeholder="Paste Render Backend URL: https://xxx.onrender.com"
+              id="custom-backend-input"
+              className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-red-500/60 font-mono"
+            />
+            <button
+              type="button"
+              onClick={async () => {
+                const input = document.getElementById('custom-backend-input') as HTMLInputElement;
+                if (input && input.value) {
+                  const clean = input.value.trim();
+                  localStorage.setItem('cookscape_api_url', clean);
+                  alert(`Backend URL updated to: ${clean}\nTesting connection...`);
+                  window.location.reload();
+                } else {
+                  localStorage.removeItem('cookscape_api_url');
+                  window.location.reload();
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-[11px] shadow-sm transition-all"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+
         {/* Security Footer */}
         <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-500">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Proprietary Cookscape Internal Server • All data encrypted & archived</span>
+          <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span>Cookscape End-to-End Enterprise Encryption Active</span>
         </div>
       </div>
     </div>

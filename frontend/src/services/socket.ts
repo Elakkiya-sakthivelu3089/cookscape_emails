@@ -7,7 +7,8 @@ export const initializeSocket = (token: string): Socket => {
     socket.disconnect();
   }
 
-  const envUrl = import.meta.env.VITE_API_URL;
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('cookscape_api_url') : null;
+  const envUrl = customUrl || import.meta.env.VITE_API_URL;
   const socketUrl = envUrl ? envUrl.trim().replace(/\/+$/, '').replace(/\/api$/, '') : window.location.origin;
 
   socket = io(socketUrl, {

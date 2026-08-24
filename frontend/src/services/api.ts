@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-const getBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL;
+export const getBaseUrl = (): string => {
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('cookscape_api_url') : null;
+  const envUrl = customUrl || import.meta.env.VITE_API_URL;
   if (!envUrl) return '/api';
   const clean = envUrl.trim().replace(/\/+$/, '');
   return clean.endsWith('/api') ? clean : `${clean}/api`;
@@ -12,6 +13,16 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Dynamic interceptor to always use latest configured backend URL
+api.interceptors.request.use((config) => {
+  config.baseURL = getBaseUrl();
+  const token = localStorage.getItem('cookscape_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Request interceptor to attach JWT token
