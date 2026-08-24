@@ -48,7 +48,7 @@ export class AdminController {
         totalClientRooms,
         auditLogsCount,
         totalStorageUsedBytes: (usersStorage._sum.usedStorageBytes || 0n).toString(),
-        departmentDistribution: usersByDept.map((d) => ({
+        departmentDistribution: usersByDept.map((d: any) => ({
           department: d.department,
           count: d._count._all,
         })),
@@ -114,7 +114,7 @@ export class AdminController {
         },
       });
 
-      const formattedUsers = users.map((u) => ({
+      const formattedUsers = users.map((u: any) => ({
         ...u,
         quotaBytes: u.quotaBytes.toString(),
         usedStorageBytes: u.usedStorageBytes.toString(),

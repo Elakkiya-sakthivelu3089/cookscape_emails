@@ -75,7 +75,9 @@ export class MailEngine {
       },
       select: { id: true, email: true, name: true },
     });
-    const userMap = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+    const userMap = new Map<string, { id: string; email: string; name: string }>(
+      users.map((u: any) => [u.email.toLowerCase(), u])
+    );
 
     // 3. Sender copy (SENT folder or DRAFTS folder)
     const senderUser = userMap.get(input.senderEmail.toLowerCase());

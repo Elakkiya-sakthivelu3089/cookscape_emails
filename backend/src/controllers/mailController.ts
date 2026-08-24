@@ -104,7 +104,7 @@ export class MailController {
         prisma.emailRecipient.count({ where: whereRecipient }),
       ]);
 
-      const formatted = items.map((item) => ({
+      const formatted = items.map((item: any) => ({
         recipientRecordId: item.id,
         folder: item.folder,
         isRead: item.isRead,

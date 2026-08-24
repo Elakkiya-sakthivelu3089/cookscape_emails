@@ -55,10 +55,10 @@ export class ChatController {
         orderBy: { updatedAt: 'desc' },
       });
 
-      const formatted = rooms.map((room) => {
+      const formatted = rooms.map((room: any) => {
         const lastMsg = room.messages[0] || null;
-        const currentMember = room.members.find((m) => m.userId === userId);
-        const otherMember = room.type === 'DIRECT' ? room.members.find((m) => m.userId !== userId)?.user : null;
+        const currentMember = room.members.find((m: any) => m.userId === userId);
+        const otherMember = room.type === 'DIRECT' ? room.members.find((m: any) => m.userId !== userId)?.user : null;
 
         return {
           id: room.id,
