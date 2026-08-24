@@ -83,10 +83,10 @@ process.on('SIGINT', () => {
 
 // Start Server
 const PORT = config.port;
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`\n======================================================`);
   console.log(`🚀 COOKSCAPE IN-HOUSE MAIL & CHAT SERVICE RUNNING`);
-  console.log(`📍 URL: http://localhost:${PORT}`);
+  console.log(`📍 Binding: 0.0.0.0:${PORT}`);
   console.log(`📧 Domain: @${config.companyDomain}`);
   console.log(`📁 Uploads Directory: ${config.uploadDir}`);
   console.log(`======================================================\n`);
@@ -94,8 +94,15 @@ server.listen(PORT, async () => {
   try {
     console.log('⚡ Syncing database schema with Prisma...');
     const { execSync } = await import('child_process');
+    
+    // Find schema.prisma dynamically whether in root or backend/
+    let schemaPath = path.resolve(process.cwd(), 'backend/prisma/schema.prisma');
+    if (!fs.existsSync(schemaPath)) {
+      schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
+    }
+
     try {
-      execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+      execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`, { stdio: 'inherit' });
       console.log('✅ Database schema verified and synced successfully.');
     } catch (pushErr: any) {
       console.warn('Note on schema push:', pushErr?.message || pushErr);
