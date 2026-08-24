@@ -3,6 +3,7 @@ import {
   X,
   Minus,
   Maximize2,
+  Minimize2,
   Paperclip,
   Send,
   Sparkles,
@@ -24,6 +25,9 @@ import { RichTextEditor } from './RichTextEditor.js';
 export const EmailComposer: React.FC = () => {
   const { isComposeOpen, closeCompose, composeDraftData, sendEmail } = useMail();
   const { user } = useAuth();
+
+  // Window State: 'normal' | 'expanded' | 'minimized' (Google Gmail style)
+  const [windowMode, setWindowMode] = useState<'normal' | 'expanded' | 'minimized'>('normal');
 
   const [to, setTo] = useState<string>('');
   const [cc, setCc] = useState<string>('');
@@ -162,27 +166,112 @@ export const EmailComposer: React.FC = () => {
     setIsSending(false);
   };
 
-  return (
-    <div className="fixed bottom-0 right-4 sm:right-8 z-50 w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700/80 rounded-t-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in slide-in-from-bottom-5 duration-200">
-      {/* Compose Window Header */}
-      <div className="bg-slate-100 dark:bg-slate-950 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-sans">
-            {composeDraftData?.threadId ? 'Reply to Thread' : 'New Cookscape Email Message'}
-          </h3>
+  // 1. Minimized Mode: Compact Floating Dock Bar (Like Gmail)
+  if (windowMode === 'minimized') {
+    return (
+      <div
+        onClick={() => setWindowMode('normal')}
+        className="fixed bottom-0 right-4 sm:right-8 z-50 w-72 sm:w-80 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-t-xl shadow-2xl overflow-hidden cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/90 transition-all flex items-center justify-between px-3.5 py-2.5 animate-in slide-in-from-bottom-3"
+      >
+        <div className="flex items-center space-x-2 truncate">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse shrink-0" />
+          <span className="text-xs font-semibold truncate font-sans">
+            {subject ? subject : 'New Message'}
+          </span>
         </div>
-
-        <div className="flex items-center space-x-2 text-slate-400">
+        <div className="flex items-center space-x-1 text-slate-400">
           <button
             type="button"
-            onClick={closeCompose}
-            className="p-1 hover:text-slate-900 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setWindowMode('normal');
+            }}
+            className="p-1 hover:text-slate-900 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Restore size"
           >
-            <X className="w-4 h-4" />
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeCompose();
+            }}
+            className="p-1 hover:text-slate-900 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+    );
+  }
+
+  // 2. Normal & Expanded Window Container
+  const isExpanded = windowMode === 'expanded';
+
+  return (
+    <>
+      {/* Dimmed backdrop when in expanded full-screen mode */}
+      {isExpanded && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+          onClick={() => setWindowMode('normal')}
+        />
+      )}
+
+      <div
+        className={`fixed z-50 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-2xl overflow-hidden flex flex-col transition-all duration-200 ${
+          isExpanded
+            ? 'inset-3 sm:inset-6 md:inset-8 lg:inset-10 rounded-2xl animate-in zoom-in-95'
+            : 'bottom-0 right-4 sm:right-8 w-full max-w-2xl h-[600px] max-h-[90vh] rounded-t-2xl animate-in slide-in-from-bottom-5'
+        }`}
+      >
+        {/* Compose Window Header (Google Gmail Style Controls) */}
+        <div className="bg-slate-100 dark:bg-slate-950 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between select-none">
+          <div className="flex items-center space-x-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-sans">
+              {composeDraftData?.threadId ? 'Reply to Thread' : 'New Cookscape Email Message'}
+            </h3>
+          </div>
+
+          <div className="flex items-center space-x-1 text-slate-400">
+            {/* Minimize to bottom bar */}
+            <button
+              type="button"
+              onClick={() => setWindowMode('minimized')}
+              className="p-1.5 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              title="Minimize"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Expand / Restore toggle */}
+            <button
+              type="button"
+              onClick={() => setWindowMode(isExpanded ? 'normal' : 'expanded')}
+              className="p-1.5 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              title={isExpanded ? 'Exit full screen' : 'Full screen'}
+            >
+              {isExpanded ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {/* Close window */}
+            <button
+              type="button"
+              onClick={closeCompose}
+              className="p-1.5 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              title="Save & Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
       {/* Template Picker & Classification Bar */}
       <div className="bg-slate-50 dark:bg-slate-950/60 px-4 py-2 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
@@ -470,5 +559,6 @@ export const EmailComposer: React.FC = () => {
         </div>
       </form>
     </div>
+  </>
   );
 };

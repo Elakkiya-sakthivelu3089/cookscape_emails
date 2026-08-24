@@ -32,28 +32,23 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 px-4 flex items-center justify-between select-none z-30 relative shadow-sm transition-colors duration-200">
-      {/* Brand Logo */}
-      <div className="flex items-center space-x-5">
+      {/* Brand Logo & Workspace Title */}
+      <div className="flex items-center space-x-3">
         <div 
           onClick={() => navigate('/mail')}
-          className="flex items-center cursor-pointer group select-none py-1"
-          title="Cookscape Mail"
+          className="flex items-center space-x-2.5 cursor-pointer group select-none py-1"
+          title="Cookscape Workspace"
         >
           <img 
             src="/logo.png" 
             alt="Cookscape" 
-            className="h-9 sm:h-10 w-auto max-w-[200px] object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200" 
+            className="h-9 sm:h-10 w-auto max-w-[200px] object-contain drop-shadow-sm group-hover:scale-102 transition-transform duration-200" 
           />
+          <span className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#006039]/15 text-[#006039] dark:text-emerald-400 border border-[#006039]/30 text-xs font-bold uppercase tracking-wider shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Workspace</span>
+          </span>
         </div>
-
-        {/* Quick Compose Button */}
-        <button
-          onClick={() => openCompose()}
-          className="hidden sm:flex items-center space-x-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white px-3.5 py-2 rounded-lg font-semibold text-xs shadow-md shadow-red-600/20 transition-all hover:scale-102 active:scale-98"
-        >
-          <PenSquare className="w-4 h-4" />
-          <span>Compose</span>
-        </button>
       </div>
 
       {/* Global Navigation Tabs */}
