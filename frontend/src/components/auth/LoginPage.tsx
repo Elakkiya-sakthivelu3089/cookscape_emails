@@ -98,8 +98,8 @@ export const LoginPage: React.FC = () => {
         {/* Login Card */}
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 transition-colors duration-200">
           {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs rounded-xl">
-              {error}
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs rounded-xl break-words">
+              {typeof error === 'string' ? error : JSON.stringify(error)}
             </div>
           )}
 

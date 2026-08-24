@@ -7,7 +7,8 @@ export const initializeSocket = (token: string): Socket => {
     socket.disconnect();
   }
 
-  const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+  const envUrl = import.meta.env.VITE_API_URL;
+  const socketUrl = envUrl ? envUrl.trim().replace(/\/+$/, '').replace(/\/api$/, '') : window.location.origin;
 
   socket = io(socketUrl, {
     auth: { token },

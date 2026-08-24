@@ -82,7 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { success: true };
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Login failed. Please check your credentials.';
+      let errorMsg = 'Login failed. Please check your credentials.';
+      if (err.response?.data?.error) {
+        errorMsg = typeof err.response.data.error === 'string'
+          ? err.response.data.error
+          : err.response.data.error.message || JSON.stringify(err.response.data.error);
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
       return { success: false, error: errorMsg };
     }
   };
@@ -124,7 +131,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.response?.data?.error || 'Password update failed' };
+      let errorMsg = 'Password update failed';
+      if (err.response?.data?.error) {
+        errorMsg = typeof err.response.data.error === 'string'
+          ? err.response.data.error
+          : err.response.data.error.message || JSON.stringify(err.response.data.error);
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      return { success: false, error: errorMsg };
     }
   };
 
