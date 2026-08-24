@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String           @id @default(uuid())
+  email              String           @unique
+  name               String
+  passwordHash       String
+  role               String           @default("EMPLOYEE") // SUPER_ADMIN, ADMIN, DESIGNER, EMPLOYEE, CLIENT
+  department         String           @default("General") // Architecture, 3D Visualization, Modular Kitchen, Client Relations, Site Ops, Management
+  designation        String           @default("Interior Designer")
+  avatar             String?
+  phone              String?
+  quotaBytes         BigInt           @default(5368709120) // 5 GB default
+  usedStorageBytes   BigInt           @default(0)
+  isActive           Boolean          @default(true)
+  forcePasswordReset Boolean          @default(false)
+  signatureHtml      String?          @db.Text
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  // Relationships
+  sentEmails         Email[]          @relation("SentEmails")
+  receivedEmails     EmailRecipient[]
+  chatMemberships    ChatMember[]
+  sentMessages       ChatMessage[]
+  auditLogs          AuditLog[]
+  createdTemplates   EmailTemplate[]
+  createdRooms       ChatRoom[]       @relation("CreatedRooms")
+
+  @@index([email])
+  @@index([department])
+}
+
+model Email {
+  id             String           @id @default(uuid())
+  threadId       String
+  senderId       String
+  senderEmail    String
+  senderName     String
+  subject        String
+  bodyHtml       String           @db.Text
+  bodyText       String           @db.Text
+  isDraft        Boolean          @default(false)
+  importance     String           @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  category       String           @default("GENERAL") // GENERAL, PROPOSAL, QUOTATION, SITE_UPDATE, BILLING
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Sender relation
+  sender         User             @relation("SentEmails", fields: [senderId], references: [id], onDelete: Cascade)
+
+  // Recipients, attachments, and user mail states
+  recipients     EmailRecipient[]
+  attachments    Attachment[]
+
+  @@index([threadId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model EmailRecipient {
+  id             String           @id @default(uuid())
+  emailId        String
+  userId         String?          // If internal employee/user
+  recipientEmail String
+  recipientName  String?
+  type           String           @default("TO") // TO, CC, BCC
+  folder         String           @default("INBOX") // INBOX, SENT, DRAFTS, TRASH, SPAM, ARCHIVE
+  isRead         Boolean          @default(false)
+  isStarred      Boolean          @default(false)
+  isArchived     Boolean          @default(false)
+  isTrash        Boolean          @default(false)
+  isSpam         Boolean          @default(false)
+  labels         String           @default("[]") @db.Text // JSON string array e.g. ["Proposal", "Villa-402"]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  email          Email            @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, folder])
+  @@index([recipientEmail])
+  @@index([emailId])
+}
+
+model Attachment {
+  id             String           @id @default(uuid())
+  emailId        String?
+  messageId      String?
+  filename       String
+  originalName   String
+  mimeType       String
+  size           Int
+  url            String
+  createdAt      DateTime         @default(now())
+
+  email          Email?           @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  chatMessage    ChatMessage?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+  @@index([messageId])
+}
+
+model ChatRoom {
+  id             String           @id @default(uuid())
+  name           String
+  description    String?          @db.Text
+  type           String           @default("CHANNEL") // CHANNEL, DIRECT, CLIENT_PROJECT
+  projectCode    String?          // e.g. CK-2026-VILLA-402
+  clientName     String?
+  isArchived     Boolean          @default(false)
+  createdById    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  createdBy      User             @relation("CreatedRooms", fields: [createdById], references: [id], onDelete: Cascade)
+  members        ChatMember[]
+  messages       ChatMessage[]
+
+  @@index([type])
+  @@index([projectCode])
+}
+
+model ChatMember {
+  id             String           @id @default(uuid())
+  roomId         String
+  userId         String
+  role           String           @default("MEMBER") // ADMIN, MEMBER, GUEST_CLIENT
+  lastReadAt     DateTime         @default(now())
+  isMuted        Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  room           ChatRoom         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  roomId         String
+  senderId       String
+  content        String           @db.Text
+  attachments    Attachment[]
+  createdAt      DateTime         @default(now())
+
+  room           ChatRoom         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender         User             @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+model EmailTemplate {
+  id             String           @id @default(uuid())
+  title          String
+  description    String?          @db.Text
+  category       String           @default("PROPOSAL") // PROPOSAL, QUOTATION, SITE_UPDATE, MOODBOARD, INVOICE
+  subject        String
+  bodyHtml       String           @db.Text
+  isDefault      Boolean          @default(false)
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  createdBy      User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+}
+
+model AuditLog {
+  id             String           @id @default(uuid())
+  userId         String?
+  action         String           // USER_CREATED, PASSWORD_CHANGED, EMAIL_SENT, MAILBOX_QUOTA_UPDATED, LOGIN_SUCCESS, CLIENT_INVITED
+  ipAddress      String?
+  userAgent      String?
+  details        String?          @db.Text // JSON payload
+  createdAt      DateTime         @default(now())
+
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt])
+}
