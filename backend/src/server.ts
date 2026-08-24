@@ -54,6 +54,50 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Database status diagnostic
+app.get('/api/db-status', async (_req, res) => {
+  try {
+    const userCount = await prisma.user.count();
+    res.json({
+      status: 'connected',
+      userCount,
+      database: 'PostgreSQL online and tables verified',
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 'database_error',
+      message: err.message,
+      code: err.code,
+      meta: err.meta,
+      hint: 'Visit /api/db-init to auto-push schema and seed demo accounts',
+    });
+  }
+});
+
+// 1-Click Database Initializer & Seeder endpoint
+app.get('/api/db-init', async (_req, res) => {
+  try {
+    const { execSync } = await import('child_process');
+    let schemaPath = path.resolve(process.cwd(), 'backend/prisma/schema.prisma');
+    if (!fs.existsSync(schemaPath)) {
+      schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
+    }
+    const output = execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`).toString();
+    await seedDatabase();
+    res.json({
+      success: true,
+      message: 'Database schema pushed and enterprise accounts seeded successfully!',
+      output,
+    });
+  } catch (err: any) {
+    console.error('db-init error:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled server error:', err);
