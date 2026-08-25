@@ -20,36 +20,32 @@ export function getSmtpTransporter(): nodemailer.Transporter | null {
       config.smtp.user.toLowerCase().includes('@gmail.com');
 
     const cleanPass = config.smtp.pass.replace(/\s+/g, '');
+    const host = isGmail ? 'smtp.gmail.com' : config.smtp.host;
+    const port = isGmail ? 465 : (config.smtp.port || 587);
+    const isSecure = port === 465;
 
-    if (isGmail) {
-      // Use Nodemailer's optimized built-in Gmail service (connects in ~1s)
-      transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: config.smtp.user,
-          pass: cleanPass,
-        },
-        connectionTimeout: 20000,
-        greetingTimeout: 20000,
-        socketTimeout: 25000,
-      });
-    } else {
-      const port = config.smtp.port || 587;
-      const isSecure = port === 465;
-
-      transporter = nodemailer.createTransport({
-        host: config.smtp.host,
-        port,
-        secure: isSecure,
-        auth: {
-          user: config.smtp.user,
-          pass: cleanPass,
-        },
-        connectionTimeout: 20000,
-        greetingTimeout: 20000,
-        socketTimeout: 25000,
-      } as any);
-    }
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: isSecure,
+      lookup: (hostname: string, _opts: any, cb: any) => {
+        // Enforce IPv4 exclusively to bypass cloud & local IPv6 routing issues (ENETUNREACH)
+        dns.lookup(hostname, { family: 4, all: false }, (err, address, family) => {
+          cb(err, address, family);
+        });
+      },
+      auth: {
+        user: config.smtp.user,
+        pass: cleanPass,
+      },
+      tls: {
+        servername: host,
+        rejectUnauthorized: true,
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 25000,
+    } as any);
   }
   return transporter;
 }
