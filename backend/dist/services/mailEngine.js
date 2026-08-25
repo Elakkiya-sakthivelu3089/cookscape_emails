@@ -241,7 +241,32 @@ class MailEngine {
                 },
             });
         }
-        const threadId = input.threadId || `thread_${crypto_1.default.randomUUID()}`;
+        // 3. Smart Thread ID resolution (match existing conversation if subject is a reply "Re: ...")
+        let threadId = input.threadId;
+        if (!threadId) {
+            const normalizedSubject = (input.subject || '')
+                .replace(/^((re|fwd|fw)\s*:\s*)+/i, '')
+                .trim();
+            if (normalizedSubject && normalizedSubject.length > 3) {
+                const existingEmail = await index_js_1.prisma.email.findFirst({
+                    where: {
+                        subject: { contains: normalizedSubject, mode: 'insensitive' },
+                        OR: [
+                            { senderEmail: cleanSenderEmail },
+                            { senderEmail: cleanRecipientEmail },
+                        ],
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    select: { threadId: true },
+                });
+                if (existingEmail) {
+                    threadId = existingEmail.threadId;
+                }
+            }
+        }
+        if (!threadId) {
+            threadId = `thread_${crypto_1.default.randomUUID()}`;
+        }
         const plainText = input.bodyText || input.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         // 3. Create the Email record
         const email = await index_js_1.prisma.email.create({
