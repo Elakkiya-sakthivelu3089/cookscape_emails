@@ -1,7 +1,57 @@
 import crypto from 'crypto';
-import { prisma } from '../config/index.js';
+import path from 'path';
+import nodemailer from 'nodemailer';
+import { config, prisma } from '../config/index.js';
 import { emitNewEmailNotification } from './socketService.js';
 import { logAudit } from './auditService.js';
+
+let transporter: nodemailer.Transporter | null = null;
+
+export function getSmtpTransporter(): nodemailer.Transporter | null {
+  if (!transporter && config.smtp.user && config.smtp.pass) {
+    const isGmail = config.smtp.host.includes('gmail') || config.smtp.user.includes('@gmail.com');
+    if (isGmail) {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: config.smtp.user,
+          pass: config.smtp.pass.replace(/\s+/g, ''),
+        },
+        connectionTimeout: 10000,
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        host: config.smtp.host,
+        port: config.smtp.port,
+        secure: config.smtp.port === 465,
+        auth: {
+          user: config.smtp.user,
+          pass: config.smtp.pass.replace(/\s+/g, ''),
+        },
+        connectionTimeout: 10000,
+      });
+    }
+  }
+  return transporter;
+}
+
+export interface InboundEmailInput {
+  senderEmail: string;
+  senderName?: string;
+  recipientEmail: string;
+  recipientUserId?: string | null;
+  subject: string;
+  bodyHtml: string;
+  bodyText?: string;
+  threadId?: string;
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
+}
 
 export interface SendEmailInput {
   senderId: string;
@@ -169,6 +219,149 @@ export class MailEngine {
           importance: email.importance,
         });
       }
+    }
+
+    // 8. Dispatch to external email addresses via SMTP (e.g. Gmail, Yahoo, Outlook)
+    const mailer = getSmtpTransporter();
+    if (mailer) {
+      const externalTo = cleanTo.filter((e) => !e.endsWith(`@${config.companyDomain}`));
+      const externalCc = cleanCc.filter((e) => !e.endsWith(`@${config.companyDomain}`));
+      const externalBcc = cleanBcc.filter((e) => !e.endsWith(`@${config.companyDomain}`));
+      const allExternal = [...externalTo, ...externalCc, ...externalBcc];
+
+      if (allExternal.length > 0) {
+        try {
+          const mailOptions: nodemailer.SendMailOptions = {
+            from: `"${input.senderName} (${config.companyName})" <${config.smtp.user}>`,
+            replyTo: input.senderEmail,
+            to: externalTo.length > 0 ? externalTo : undefined,
+            cc: externalCc.length > 0 ? externalCc : undefined,
+            bcc: externalBcc.length > 0 ? externalBcc : undefined,
+            subject: input.subject || '(No Subject)',
+            html: input.bodyHtml,
+            text: plainText,
+            headers: {
+              'X-Cookscape-Thread-Id': threadId,
+              'X-Cookscape-Sender': input.senderEmail,
+            },
+          };
+
+          if (input.attachments && input.attachments.length > 0) {
+            mailOptions.attachments = input.attachments.map((att) => ({
+              filename: att.originalName,
+              path: path.resolve(config.uploadDir, att.filename),
+            }));
+          }
+
+          const info = await mailer.sendMail(mailOptions);
+          console.log(`[SMTP] External mail successfully sent to [${allExternal.join(', ')}]. Message ID: ${info.messageId}`);
+        } catch (smtpErr: any) {
+          console.error('[SMTP] Error delivering external mail:', smtpErr.message);
+        }
+      }
+    }
+
+    return email;
+  }
+
+  /**
+   * Process and store an incoming email from an external service (Gmail, Yahoo, Outlook, etc.)
+   */
+  static async receiveInboundEmail(input: InboundEmailInput) {
+    const cleanSenderEmail = input.senderEmail.trim().toLowerCase();
+    const cleanRecipientEmail = input.recipientEmail.trim().toLowerCase();
+
+    // 1. Resolve internal recipient user
+    let recipientUser = null;
+    if (input.recipientUserId) {
+      recipientUser = await prisma.user.findUnique({ where: { id: input.recipientUserId } });
+    } else {
+      recipientUser = await prisma.user.findUnique({ where: { email: cleanRecipientEmail } });
+    }
+
+    // 2. Resolve or create external sender contact/user in DB
+    let senderUser = await prisma.user.findUnique({ where: { email: cleanSenderEmail } });
+    if (!senderUser) {
+      const generatedName = input.senderName || cleanSenderEmail.split('@')[0];
+      senderUser = await prisma.user.create({
+        data: {
+          email: cleanSenderEmail,
+          name: generatedName,
+          passwordHash: '', // External user
+          role: 'CLIENT',
+          department: 'External Contact',
+          designation: 'Client / External Contact',
+          isActive: true,
+        },
+      });
+    }
+
+    const threadId = input.threadId || `thread_${crypto.randomUUID()}`;
+    const plainText = input.bodyText || input.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 3. Create the Email record
+    const email = await prisma.email.create({
+      data: {
+        threadId,
+        senderId: senderUser.id,
+        senderEmail: cleanSenderEmail,
+        senderName: senderUser.name,
+        subject: input.subject || '(No Subject)',
+        bodyHtml: input.bodyHtml || '',
+        bodyText: plainText,
+        isDraft: false,
+        importance: 'NORMAL',
+        category: 'GENERAL',
+        attachments: input.attachments && input.attachments.length > 0 ? {
+          create: input.attachments.map((att) => ({
+            filename: att.filename,
+            originalName: att.originalName,
+            mimeType: att.mimeType,
+            size: att.size,
+            url: att.url,
+          })),
+        } : undefined,
+      },
+      include: {
+        attachments: true,
+      },
+    });
+
+    // 4. Create Recipient record in INBOX for the recipient
+    await prisma.emailRecipient.create({
+      data: {
+        emailId: email.id,
+        userId: recipientUser ? recipientUser.id : null,
+        recipientEmail: cleanRecipientEmail,
+        recipientName: recipientUser ? recipientUser.name : cleanRecipientEmail.split('@')[0],
+        type: 'TO',
+        folder: 'INBOX',
+        isRead: false,
+      },
+    });
+
+    // 5. Log audit and push real-time notification
+    if (recipientUser) {
+      await logAudit({
+        userId: recipientUser.id,
+        action: 'INBOUND_EMAIL_RECEIVED',
+        details: {
+          emailId: email.id,
+          from: cleanSenderEmail,
+          subject: email.subject,
+        },
+      });
+
+      emitNewEmailNotification(recipientUser.id, {
+        id: email.id,
+        threadId: email.threadId,
+        subject: email.subject,
+        senderName: email.senderName,
+        senderEmail: email.senderEmail,
+        snippet: email.bodyText.substring(0, 120),
+        createdAt: email.createdAt,
+        importance: email.importance,
+      });
     }
 
     return email;

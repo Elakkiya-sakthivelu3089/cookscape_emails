@@ -401,4 +401,120 @@ export class MailController {
       res.status(500).json({ error: 'Failed to upload attachment.' });
     }
   }
+
+  // 8. Test SMTP Connection
+  static async testSmtpConnection(_req: any, res: Response): Promise<void> {
+    try {
+      const { getSmtpTransporter } = await import('../services/mailEngine.js');
+      const transporter = getSmtpTransporter();
+
+      if (!transporter) {
+        res.status(400).json({
+          success: false,
+          error: 'SMTP credentials not configured in environment variables.',
+        });
+        return;
+      }
+
+      await transporter.verify();
+      res.json({
+        success: true,
+        message: 'SMTP credentials verified successfully! Outbound external email is ready.',
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        user: process.env.SMTP_USER,
+      });
+    } catch (error: any) {
+      console.error('SMTP test error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to verify SMTP credentials.',
+      });
+    }
+  }
+
+  // 9. Handle Inbound Webhook (SendGrid, Mailgun, Resend, or ngrok tunnel)
+  static async handleInboundWebhook(req: any, res: Response): Promise<void> {
+    try {
+      const body = req.body || {};
+      const rawFrom = body.from || body.sender || body.envelope?.from || '';
+      const rawTo = body.to || body.recipient || body.envelope?.to || '';
+      const subject = body.subject || '(No Subject)';
+      const html = body.html || body['body-html'] || body.text || '';
+      const text = body.text || body['body-plain'] || '';
+
+      if (!rawFrom || !rawTo) {
+        res.status(400).json({ error: 'Missing required "from" or "to" field.' });
+        return;
+      }
+
+      // Parse email addresses
+      const fromEmailMatch = String(rawFrom).match(/<([^>]+)>/);
+      const senderEmail = (fromEmailMatch ? fromEmailMatch[1] : String(rawFrom)).trim().toLowerCase();
+      const senderName = String(rawFrom).split('<')[0].replace(/["']/g, '').trim() || senderEmail.split('@')[0];
+
+      const toTarget = Array.isArray(rawTo) ? rawTo[0] : String(rawTo);
+      const toEmailMatch = toTarget.match(/<([^>]+)>/);
+      const recipientEmail = (toEmailMatch ? toEmailMatch[1] : toTarget).trim().toLowerCase();
+
+      const email = await MailEngine.receiveInboundEmail({
+        senderEmail,
+        senderName,
+        recipientEmail,
+        subject,
+        bodyHtml: html,
+        bodyText: text,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Inbound email received and saved successfully.',
+        emailId: email.id,
+        threadId: email.threadId,
+      });
+    } catch (error: any) {
+      console.error('Inbound webhook error:', error);
+      res.status(500).json({ error: error.message || 'Failed to process inbound email.' });
+    }
+  }
+
+  // 10. Simulate Inbound Email (Local development testing tool)
+  static async simulateInboundEmail(req: any, res: Response): Promise<void> {
+    try {
+      const {
+        from = 'client.ananya@gmail.com',
+        fromName = 'Ananya Client (Villa 402)',
+        to = 'priya.designer@cookscape.com',
+        subject = 'Update on Living Room Floor Plan & Colors',
+        html = '<p>Hi Priya,<br/><br/>We loved the latest 3D render of the living room! Could we explore warm oak veneer for the TV console?<br/><br/>Best regards,<br/>Ananya</p>',
+        text = 'Hi Priya,\n\nWe loved the latest 3D render of the living room! Could we explore warm oak veneer for the TV console?\n\nBest regards,\nAnanya',
+        threadId,
+      } = req.body;
+
+      const email = await MailEngine.receiveInboundEmail({
+        senderEmail: from,
+        senderName: fromName,
+        recipientEmail: to,
+        subject,
+        bodyHtml: html,
+        bodyText: text,
+        threadId,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Simulated inbound email delivered into ${to}'s INBOX!`,
+        email: {
+          id: email.id,
+          threadId: email.threadId,
+          senderEmail: email.senderEmail,
+          senderName: email.senderName,
+          subject: email.subject,
+          createdAt: email.createdAt,
+        },
+      });
+    } catch (error: any) {
+      console.error('Simulate inbound error:', error);
+      res.status(500).json({ error: error.message || 'Failed to simulate inbound email.' });
+    }
+  }
 }

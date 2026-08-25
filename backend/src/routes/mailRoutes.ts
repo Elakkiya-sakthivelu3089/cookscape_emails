@@ -5,6 +5,13 @@ import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
+// Public Webhook & Testing Endpoints (No JWT required)
+router.get('/test-smtp', MailController.testSmtpConnection);
+router.post('/test-smtp', MailController.testSmtpConnection);
+router.post('/inbound-webhook', MailController.handleInboundWebhook);
+router.post('/simulate-inbound', MailController.simulateInboundEmail);
+
+// Protected routes (JWT required)
 router.use(authenticate);
 
 router.get('/', MailController.getEmails);

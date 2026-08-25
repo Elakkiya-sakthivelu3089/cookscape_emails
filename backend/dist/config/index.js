@@ -18,6 +18,12 @@ exports.config = {
     companyName: process.env.COMPANY_NAME || 'Cookscape Interior Designs',
     uploadDir: path_1.default.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads'),
     maxStoragePerUser: BigInt(5 * 1024 * 1024 * 1024), // 5 GB
+    smtp: {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+    },
 };
 // Ensure upload directory exists
 if (!fs_1.default.existsSync(exports.config.uploadDir)) {
