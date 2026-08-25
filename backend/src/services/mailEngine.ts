@@ -15,29 +15,41 @@ let transporter: nodemailer.Transporter | null = null;
 
 export function getSmtpTransporter(): nodemailer.Transporter | null {
   if (!transporter && config.smtp.user && config.smtp.pass) {
-    const isGmail = config.smtp.host.includes('gmail') || config.smtp.user.includes('@gmail.com');
-    const port = config.smtp.port || 587;
-    const isSecure = port === 465;
+    const isGmail =
+      config.smtp.host.includes('gmail') ||
+      config.smtp.user.toLowerCase().includes('@gmail.com');
 
-    transporter = nodemailer.createTransport({
-      host: isGmail ? 'smtp.gmail.com' : config.smtp.host,
-      port,
-      secure: isSecure,
-      requireTLS: !isSecure,
-      lookup: (hostname: string, _options: any, callback: any) => {
-        // Strictly force IPv4 resolution (bypasses any IPv6 unreachable route)
-        dns.lookup(hostname, { family: 4, all: false }, (err, address, family) => {
-          callback(err, address, family);
-        });
-      },
-      auth: {
-        user: config.smtp.user,
-        pass: config.smtp.pass.replace(/\s+/g, ''),
-      },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
-    } as any);
+    const cleanPass = config.smtp.pass.replace(/\s+/g, '');
+
+    if (isGmail) {
+      // Use Nodemailer's optimized built-in Gmail service (connects in ~1s)
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: config.smtp.user,
+          pass: cleanPass,
+        },
+        connectionTimeout: 20000,
+        greetingTimeout: 20000,
+        socketTimeout: 25000,
+      });
+    } else {
+      const port = config.smtp.port || 587;
+      const isSecure = port === 465;
+
+      transporter = nodemailer.createTransport({
+        host: config.smtp.host,
+        port,
+        secure: isSecure,
+        auth: {
+          user: config.smtp.user,
+          pass: cleanPass,
+        },
+        connectionTimeout: 20000,
+        greetingTimeout: 20000,
+        socketTimeout: 25000,
+      } as any);
+    }
   }
   return transporter;
 }

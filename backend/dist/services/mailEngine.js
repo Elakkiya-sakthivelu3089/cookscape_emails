@@ -20,23 +20,38 @@ catch (_) { }
 let transporter = null;
 function getSmtpTransporter() {
     if (!transporter && index_js_1.config.smtp.user && index_js_1.config.smtp.pass) {
-        const isGmail = index_js_1.config.smtp.host.includes('gmail') || index_js_1.config.smtp.user.includes('@gmail.com');
-        const port = index_js_1.config.smtp.port || 587;
-        const isSecure = port === 465;
-        transporter = nodemailer_1.default.createTransport({
-            host: isGmail ? 'smtp.gmail.com' : index_js_1.config.smtp.host,
-            port,
-            secure: isSecure,
-            requireTLS: !isSecure,
-            family: 4, // <-- Explicitly force IPv4 (fixes Render/cloud ENETUNREACH on IPv6)
-            auth: {
-                user: index_js_1.config.smtp.user,
-                pass: index_js_1.config.smtp.pass.replace(/\s+/g, ''),
-            },
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000,
-        });
+        const isGmail = index_js_1.config.smtp.host.includes('gmail') ||
+            index_js_1.config.smtp.user.toLowerCase().includes('@gmail.com');
+        const cleanPass = index_js_1.config.smtp.pass.replace(/\s+/g, '');
+        if (isGmail) {
+            // Use Nodemailer's optimized built-in Gmail service (connects in ~1s)
+            transporter = nodemailer_1.default.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: index_js_1.config.smtp.user,
+                    pass: cleanPass,
+                },
+                connectionTimeout: 20000,
+                greetingTimeout: 20000,
+                socketTimeout: 25000,
+            });
+        }
+        else {
+            const port = index_js_1.config.smtp.port || 587;
+            const isSecure = port === 465;
+            transporter = nodemailer_1.default.createTransport({
+                host: index_js_1.config.smtp.host,
+                port,
+                secure: isSecure,
+                auth: {
+                    user: index_js_1.config.smtp.user,
+                    pass: cleanPass,
+                },
+                connectionTimeout: 20000,
+                greetingTimeout: 20000,
+                socketTimeout: 25000,
+            });
+        }
     }
     return transporter;
 }
