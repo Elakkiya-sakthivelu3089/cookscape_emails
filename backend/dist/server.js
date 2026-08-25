@@ -7,6 +7,8 @@ const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const index_js_1 = require("./config/index.js");
 const socketService_js_1 = require("./services/socketService.js");
 const seedService_js_1 = require("./services/seedService.js");
@@ -49,6 +51,50 @@ app.get('/api/health', (_req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+// Database status diagnostic
+app.get('/api/db-status', async (_req, res) => {
+    try {
+        const userCount = await index_js_1.prisma.user.count();
+        res.json({
+            status: 'connected',
+            userCount,
+            database: 'PostgreSQL online and tables verified',
+        });
+    }
+    catch (err) {
+        res.status(500).json({
+            status: 'database_error',
+            message: err.message,
+            code: err.code,
+            meta: err.meta,
+            hint: 'Visit /api/db-init to auto-push schema and seed demo accounts',
+        });
+    }
+});
+// 1-Click Database Initializer & Seeder endpoint
+app.get('/api/db-init', async (_req, res) => {
+    try {
+        const { execSync } = await import('child_process');
+        let schemaPath = path_1.default.resolve(process.cwd(), 'backend/prisma/schema.prisma');
+        if (!fs_1.default.existsSync(schemaPath)) {
+            schemaPath = path_1.default.resolve(process.cwd(), 'prisma/schema.prisma');
+        }
+        const output = execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`).toString();
+        await (0, seedService_js_1.seedDatabase)();
+        res.json({
+            success: true,
+            message: 'Database schema pushed and enterprise accounts seeded successfully!',
+            output,
+        });
+    }
+    catch (err) {
+        console.error('db-init error:', err);
+        res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
+});
 // Error handling middleware
 app.use((err, _req, res, _next) => {
     console.error('Unhandled server error:', err);
@@ -76,22 +122,37 @@ process.on('SIGINT', () => {
 });
 // Start Server
 const PORT = index_js_1.config.port;
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
     console.log(`\n======================================================`);
     console.log(`🚀 COOKSCAPE IN-HOUSE MAIL & CHAT SERVICE RUNNING`);
-    console.log(`📍 URL: http://localhost:${PORT}`);
+    console.log(`📍 Binding: 0.0.0.0:${PORT}`);
     console.log(`📧 Domain: @${index_js_1.config.companyDomain}`);
     console.log(`📁 Uploads Directory: ${index_js_1.config.uploadDir}`);
     console.log(`======================================================\n`);
     try {
-        // Auto-seed if database is newly initialized
+        console.log('⚡ Syncing database schema with Prisma...');
+        const { execSync } = await import('child_process');
+        // Find schema.prisma dynamically whether in root or backend/
+        let schemaPath = path_1.default.resolve(process.cwd(), 'backend/prisma/schema.prisma');
+        if (!fs_1.default.existsSync(schemaPath)) {
+            schemaPath = path_1.default.resolve(process.cwd(), 'prisma/schema.prisma');
+        }
+        try {
+            execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`, { stdio: 'inherit' });
+            console.log('✅ Database schema verified and synced successfully.');
+        }
+        catch (pushErr) {
+            console.warn('Note on schema push:', pushErr?.message || pushErr);
+        }
+        // Auto-seed if database has no users
         const userCount = await index_js_1.prisma.user.count();
         if (userCount === 0) {
-            console.log('⚡ Initializing and seeding Cookscape database...');
+            console.log('⚡ Seeding initial Cookscape enterprise accounts...');
             await (0, seedService_js_1.seedDatabase)();
+            console.log('✅ Seed completed successfully!');
         }
     }
     catch (error) {
-        console.error('Error during auto-seed check:', error);
+        console.error('Error during database initialization/seeding:', error);
     }
 });

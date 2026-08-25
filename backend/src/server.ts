@@ -3,6 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { config, prisma } from './config/index.js';
 import { initSocketService } from './services/socketService.js';
 import { seedDatabase } from './services/seedService.js';
