@@ -24,7 +24,12 @@ export function getSmtpTransporter(): nodemailer.Transporter | null {
       port,
       secure: isSecure,
       requireTLS: !isSecure,
-      family: 4, // <-- Explicitly force IPv4 (fixes Render/cloud ENETUNREACH on IPv6)
+      lookup: (hostname: string, _options: any, callback: any) => {
+        // Strictly force IPv4 resolution (bypasses any IPv6 unreachable route)
+        dns.lookup(hostname, { family: 4, all: false }, (err, address, family) => {
+          callback(err, address, family);
+        });
+      },
       auth: {
         user: config.smtp.user,
         pass: config.smtp.pass.replace(/\s+/g, ''),
