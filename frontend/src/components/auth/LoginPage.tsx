@@ -181,14 +181,14 @@ export const LoginPage: React.FC = () => {
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
             <span className="font-medium text-[11px]">🔗 Backend API Server:</span>
             <span className="font-mono text-[10px] text-red-600 dark:text-red-400 truncate max-w-[200px]">
-              {localStorage.getItem('cookscape_api_url') || import.meta.env.VITE_API_URL || '(Local Proxy)'}
+              {localStorage.getItem('cookscape_api_url') || '(Localhost: 5000)'}
             </span>
           </div>
           <div className="flex items-center space-x-2 pt-1">
             <input
               type="text"
-              defaultValue={localStorage.getItem('cookscape_api_url') || import.meta.env.VITE_API_URL || ''}
-              placeholder="Paste Render Backend URL: https://xxx.onrender.com"
+              defaultValue={localStorage.getItem('cookscape_api_url') || ''}
+              placeholder="e.g. http://localhost:5000 or leave blank for Local"
               id="custom-backend-input"
               className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-red-500/60 font-mono"
             />
@@ -196,10 +196,9 @@ export const LoginPage: React.FC = () => {
               type="button"
               onClick={async () => {
                 const input = document.getElementById('custom-backend-input') as HTMLInputElement;
-                if (input && input.value) {
+                if (input && input.value.trim()) {
                   const clean = input.value.trim();
                   localStorage.setItem('cookscape_api_url', clean);
-                  alert(`Backend URL updated to: ${clean}\nTesting connection...`);
                   window.location.reload();
                 } else {
                   localStorage.removeItem('cookscape_api_url');
@@ -208,8 +207,21 @@ export const LoginPage: React.FC = () => {
               }}
               className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-[11px] shadow-sm transition-all"
             >
-              Connect
+              Save
             </button>
+            {localStorage.getItem('cookscape_api_url') && (
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('cookscape_api_url');
+                  window.location.reload();
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition-all"
+                title="Reset to Localhost 5000"
+              >
+                Use Local
+              </button>
+            )}
           </div>
         </div>
 
