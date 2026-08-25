@@ -75,15 +75,45 @@ app.get('/api/db-status', async (_req, res) => {
   }
 });
 
+// Dynamic Schema Path Resolver
+function getSchemaPath(): string {
+  let schemaPath = path.resolve(process.cwd(), 'backend/prisma/schema.prisma');
+  if (!fs.existsSync(schemaPath)) {
+    schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
+  }
+  return schemaPath;
+}
+
+// Safe Prisma DB Push runner using local or pinned Prisma 6
+async function runPrismaDbPush(inheritStdio = false): Promise<string> {
+  const { execSync } = await import('child_process');
+  const schemaPath = getSchemaPath();
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'backend/node_modules/.bin/prisma'),
+    path.resolve(process.cwd(), 'node_modules/.bin/prisma'),
+    path.resolve(process.cwd(), '../node_modules/.bin/prisma'),
+  ];
+
+  let command = `npx --yes prisma@6.4.1 db push --schema="${schemaPath}" --accept-data-loss`;
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      command = `"${p}" db push --schema="${schemaPath}" --accept-data-loss`;
+      break;
+    }
+  }
+
+  const options: any = { env: { ...process.env } };
+  if (inheritStdio) {
+    options.stdio = 'inherit';
+  }
+  const result = execSync(command, options);
+  return result ? result.toString() : '';
+}
+
 // 1-Click Database Initializer & Seeder endpoint
 app.get('/api/db-init', async (_req, res) => {
   try {
-    const { execSync } = await import('child_process');
-    let schemaPath = path.resolve(process.cwd(), 'backend/prisma/schema.prisma');
-    if (!fs.existsSync(schemaPath)) {
-      schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
-    }
-    const output = execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`).toString();
+    const output = await runPrismaDbPush(false);
     await seedDatabase();
     res.json({
       success: true,
@@ -138,16 +168,8 @@ server.listen(PORT, '0.0.0.0', async () => {
 
   try {
     console.log('⚡ Syncing database schema with Prisma...');
-    const { execSync } = await import('child_process');
-    
-    // Find schema.prisma dynamically whether in root or backend/
-    let schemaPath = path.resolve(process.cwd(), 'backend/prisma/schema.prisma');
-    if (!fs.existsSync(schemaPath)) {
-      schemaPath = path.resolve(process.cwd(), 'prisma/schema.prisma');
-    }
-
     try {
-      execSync(`npx prisma db push --schema="${schemaPath}" --accept-data-loss`, { stdio: 'inherit' });
+      await runPrismaDbPush(true);
       console.log('✅ Database schema verified and synced successfully.');
     } catch (pushErr: any) {
       console.warn('Note on schema push:', pushErr?.message || pushErr);
