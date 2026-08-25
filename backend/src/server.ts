@@ -1,10 +1,17 @@
 import express from 'express';
 import http from 'http';
+import dns from 'dns';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { config, prisma } from './config/index.js';
+
+// Prioritize IPv4 for all network requests (fixes ENETUNREACH on Render/Cloud containers)
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {}
+
 import { initSocketService } from './services/socketService.js';
 import { seedDatabase } from './services/seedService.js';
 

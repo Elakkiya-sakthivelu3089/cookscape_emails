@@ -1,36 +1,38 @@
 import crypto from 'crypto';
 import path from 'path';
+import dns from 'dns';
 import nodemailer from 'nodemailer';
 import { config, prisma } from '../config/index.js';
 import { emitNewEmailNotification } from './socketService.js';
 import { logAudit } from './auditService.js';
+
+// Force IPv4 over IPv6 to prevent ENETUNREACH in cloud containers like Render
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {}
 
 let transporter: nodemailer.Transporter | null = null;
 
 export function getSmtpTransporter(): nodemailer.Transporter | null {
   if (!transporter && config.smtp.user && config.smtp.pass) {
     const isGmail = config.smtp.host.includes('gmail') || config.smtp.user.includes('@gmail.com');
-    if (isGmail) {
-      transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: config.smtp.user,
-          pass: config.smtp.pass.replace(/\s+/g, ''),
-        },
-        connectionTimeout: 10000,
-      });
-    } else {
-      transporter = nodemailer.createTransport({
-        host: config.smtp.host,
-        port: config.smtp.port,
-        secure: config.smtp.port === 465,
-        auth: {
-          user: config.smtp.user,
-          pass: config.smtp.pass.replace(/\s+/g, ''),
-        },
-        connectionTimeout: 10000,
-      });
-    }
+    const port = config.smtp.port || 587;
+    const isSecure = port === 465;
+
+    transporter = nodemailer.createTransport({
+      host: isGmail ? 'smtp.gmail.com' : config.smtp.host,
+      port,
+      secure: isSecure,
+      requireTLS: !isSecure,
+      family: 4, // <-- Explicitly force IPv4 (fixes Render/cloud ENETUNREACH on IPv6)
+      auth: {
+        user: config.smtp.user,
+        pass: config.smtp.pass.replace(/\s+/g, ''),
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    } as any);
   }
   return transporter;
 }

@@ -5,11 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
+const dns_1 = __importDefault(require("dns"));
 const socket_io_1 = require("socket.io");
 const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const index_js_1 = require("./config/index.js");
+// Prioritize IPv4 for all network requests (fixes ENETUNREACH on Render/Cloud containers)
+try {
+    dns_1.default.setDefaultResultOrder('ipv4first');
+}
+catch (_) { }
 const socketService_js_1 = require("./services/socketService.js");
 const seedService_js_1 = require("./services/seedService.js");
 const authRoutes_js_1 = __importDefault(require("./routes/authRoutes.js"));

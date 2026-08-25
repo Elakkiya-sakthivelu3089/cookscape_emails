@@ -7,36 +7,36 @@ exports.MailEngine = void 0;
 exports.getSmtpTransporter = getSmtpTransporter;
 const crypto_1 = __importDefault(require("crypto"));
 const path_1 = __importDefault(require("path"));
+const dns_1 = __importDefault(require("dns"));
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const index_js_1 = require("../config/index.js");
 const socketService_js_1 = require("./socketService.js");
 const auditService_js_1 = require("./auditService.js");
+// Force IPv4 over IPv6 to prevent ENETUNREACH in cloud containers like Render
+try {
+    dns_1.default.setDefaultResultOrder('ipv4first');
+}
+catch (_) { }
 let transporter = null;
 function getSmtpTransporter() {
     if (!transporter && index_js_1.config.smtp.user && index_js_1.config.smtp.pass) {
         const isGmail = index_js_1.config.smtp.host.includes('gmail') || index_js_1.config.smtp.user.includes('@gmail.com');
-        if (isGmail) {
-            transporter = nodemailer_1.default.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: index_js_1.config.smtp.user,
-                    pass: index_js_1.config.smtp.pass.replace(/\s+/g, ''),
-                },
-                connectionTimeout: 10000,
-            });
-        }
-        else {
-            transporter = nodemailer_1.default.createTransport({
-                host: index_js_1.config.smtp.host,
-                port: index_js_1.config.smtp.port,
-                secure: index_js_1.config.smtp.port === 465,
-                auth: {
-                    user: index_js_1.config.smtp.user,
-                    pass: index_js_1.config.smtp.pass.replace(/\s+/g, ''),
-                },
-                connectionTimeout: 10000,
-            });
-        }
+        const port = index_js_1.config.smtp.port || 587;
+        const isSecure = port === 465;
+        transporter = nodemailer_1.default.createTransport({
+            host: isGmail ? 'smtp.gmail.com' : index_js_1.config.smtp.host,
+            port,
+            secure: isSecure,
+            requireTLS: !isSecure,
+            family: 4, // <-- Explicitly force IPv4 (fixes Render/cloud ENETUNREACH on IPv6)
+            auth: {
+                user: index_js_1.config.smtp.user,
+                pass: index_js_1.config.smtp.pass.replace(/\s+/g, ''),
+            },
+            connectionTimeout: 15000,
+            greetingTimeout: 15000,
+            socketTimeout: 20000,
+        });
     }
     return transporter;
 }
